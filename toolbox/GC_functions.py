@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller, grangercausalitytests,kpss
 import matplotlib.pyplot as plt
 
-def is_stationary(series, test_method='ADF'):
+def is_stationary(series, test_method='ADF', print_results=True):
     """
     Check if a time series is stationary.
 
@@ -21,35 +21,38 @@ def is_stationary(series, test_method='ADF'):
     if test_method == 'ADF':
         # Perform Augmented Dickey-Fuller test
         result = adfuller(series)
-        print(f'ADF Statistic: {result[0]}')
-        print(f'p-value: {result[1]}')
-        print('Critical Values:')
-        for key, value in result[4].items():
-            print(f'\t{key}: {value}')
+        if print_results:
+            print(f'ADF Statistic: {result[0]}')
+            print(f'p-value: {result[1]}')
+            print('Critical Values:')
+            for key, value in result[4].items():
+                print(f'\t{key}: {value}')
         is_stationary = result[1] <= 0.05
 
     elif test_method == 'KPSS':
         # Perform KPSS test
         statistic, p_value, _, critical_values = kpss(series, 'c')
-        print(f'KPSS Statistic: {statistic}')
-        print(f'p-value: {p_value}')
-        print('Critical Values:')
-        for key, value in critical_values.items():
-            print(f'\t{key}: {value}')
+        if print_results:
+            print(f'KPSS Statistic: {statistic}')
+            print(f'p-value: {p_value}')
+            print('Critical Values:')
+            for key, value in critical_values.items():
+                print(f'\t{key}: {value}')
         # In KPSS test, the null hypothesis is that the series is stationary
         is_stationary = p_value > 0.05
 
     # Print result
-    if is_stationary:
-        print("The series is stationary.")
-    else:
-        print("The series is not stationary.")
+    if print_results:
+        if is_stationary:
+            print("The series is stationary.")
+        else:
+            print("The series is not stationary.")
 
     return is_stationary
 
 
 
-def make_stationary(df, column_names, test_method='ADF',plot=False):
+def make_stationary(df, column_names, test_method='ADF',plot=False, print_results=False):
     """
     Process the specified columns of a DataFrame to ensure stationarity.
     If a series is not stationary, it is differenced up to a maximum of 5 times.
@@ -68,8 +71,9 @@ def make_stationary(df, column_names, test_method='ADF',plot=False):
         for i in range(1, 6):  # Maximum of 5 differencing operations
             # Ensure the series does not have NaN values
             series = modified_df[column].dropna()
-            if is_stationary(series.values, test_method):
-                print(f"Series in column '{column}' is stationary after {i-1} differencing operation(s).")
+            if is_stationary(series.values, test_method, print_results):
+                if print_results:
+                    print(f"Series in column '{column}' is stationary after {i-1} differencing operation(s).")
                 break
             else:
                 if i < 5:  # Only difference if we haven't reached the max differencing order
@@ -82,7 +86,8 @@ def make_stationary(df, column_names, test_method='ADF',plot=False):
                         plt.title(f"Original vs Differenced Data for {column} (Order {i})")
                         plt.show()
                 else:
-                    print(f"Series in column '{column}' is not stationary after 5 differencing operations.")
+                    if print_results:
+                        print(f"Series in column '{column}' is not stationary after 5 differencing operations.")
     # drop NaN values
     modified_df = modified_df.dropna()
     return modified_df
@@ -141,7 +146,7 @@ def make_stationary(df, column_names, test_method='ADF',plot=False):
 
 
 
-def gc_test(data, column_x, column_y, max_lags=4):
+def gc_test(data, column_x, column_y, max_lags=4, print_results=True):
     """
     Perform Granger Causality test in both directions and format the result.
     
@@ -179,10 +184,40 @@ def gc_test(data, column_x, column_y, max_lags=4):
     result_str += "Direction                   F-statistics         p-value         lag         Granger cause\n"
     result_str += f"{column_x} => {column_y}    {best_f_xy:.3f}               {best_p_xy:.3f}                {best_lag_xy}                {test_passed_xy}\n"
     result_str += f"{column_y} => {column_x}    {best_f_yx:.3f}               {best_p_yx:.3f}                {best_lag_yx}                {test_passed_yx}\n"
-    print(result_str)
+    if print_results:
+        print(result_str)
     
     return result_str
 
+def gc4vars(df, max_lags=10, print_results=True):
+
+    
+    gc_results = []  # List to store the results
+    columns = df.columns
+    
+    for i in range(len(columns)):
+        for j in range(i+1, len(columns)):
+            column_x = columns[i]
+            column_y = columns[j]
+            if print_results:
+                print(f"Testing causality between: {column_x} and {column_y}")
+            
+            # Call the gc_test function with specified max_lags
+            result_str = gc_test(df, column_x, column_y, max_lags=max_lags, print_results=print_results)
+            
+            # Parse the result_str to extract causality results
+            lines = result_str.split('\n')
+            cause_xy = lines[-3].split()[-1]  # Extracts the "True" or "False" for X => Y
+            cause_yx = lines[-2].split()[-1]  # Extracts the "True" or "False" for Y => X
+            
+            # Store the results
+            gc_results.append({
+                'variables': (column_x, column_y),
+                'XY': cause_xy == 'True',
+                'YX': cause_yx == 'True'
+            })
+    
+    return gc_results
 
 
 from statsmodels.tsa.arima.model import ARIMA
@@ -231,35 +266,6 @@ def find_optimal_ar_order(df, show_figures=False):
 
 
 
-
-def gc4vars(df, max_lags=10):
-
-    
-    gc_results = []  # List to store the results
-    columns = df.columns
-    
-    for i in range(len(columns)):
-        for j in range(i+1, len(columns)):
-            column_x = columns[i]
-            column_y = columns[j]
-            print(f"Testing causality between: {column_x} and {column_y}")
-            
-            # Call the gc_test function with specified max_lags
-            result_str = gc_test(df, column_x, column_y, max_lags=max_lags)
-            
-            # Parse the result_str to extract causality results
-            lines = result_str.split('\n')
-            cause_xy = lines[-3].split()[-1]  # Extracts the "True" or "False" for X => Y
-            cause_yx = lines[-2].split()[-1]  # Extracts the "True" or "False" for Y => X
-            
-            # Store the results
-            gc_results.append({
-                'variables': (column_x, column_y),
-                'XY': cause_xy == 'True',
-                'YX': cause_yx == 'True'
-            })
-    
-    return gc_results
 
 
 
