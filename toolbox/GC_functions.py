@@ -95,54 +95,64 @@ def make_stationary(df, column_names, test_method='ADF',plot=False, print_result
 
 
 
+from statsmodels.tsa.stattools import grangercausalitytests
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def gc_test_single_pair(args):
+    """
+    Perform Granger Causality test for a single pair of time series.
+    
+    Parameters:
+    - args: tuple containing data_x_col, data_y_col, and max_lags
+    
+    Returns:
+    - Tuple of two booleans: (result_xy, result_yx) indicating the direction of Granger causality for the pair.
+    """
+    data_x_col, data_y_col, max_lags = args
+    
+    # Drop NaN values from both time series
+    valid_idx = ~np.isnan(data_x_col) & ~np.isnan(data_y_col)
+    data_x_col_clean = data_x_col[valid_idx]
+    data_y_col_clean = data_y_col[valid_idx]
+
+    # Combine the cleaned and cropped data for Granger Causality test
+    combined_data = np.column_stack((data_x_col_clean, data_y_col_clean))
+    
+    # Granger Causality test
+    result_xy = grangercausalitytests(combined_data, max_lags, verbose=False)
+    result_yx = grangercausalitytests(combined_data[:, [1, 0]], max_lags, verbose=False)
+    
+    # Simplify result interpretation
+    test_result_xy = any(result_xy[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+    test_result_yx = any(result_yx[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+    
+    return test_result_xy, test_result_yx
+
+def gc_test_parallel(data_x, data_y, max_lags=4, num_workers=None):
+    """
+    Perform Granger Causality tests in parallel for each pair of columns in data_x and data_y.
+    
+    Parameters:
+    - data_x, data_y: 2D NumPy ndarrays containing the time series data.
+    - max_lags: int, maximum number of lags to test for.
+    - num_workers: int or None, number of worker threads to use. If None, it will use the default.
+    
+    Returns:
+    - List of tuples with the Granger Causality test results for each pair.
+    """
+    num_series = data_x.shape[1]
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(gc_test_single_pair, (data_x[:, i], data_y[:, i], max_lags)) for i in range(num_series)]
+        
+        results = []
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+    return results
 
 
 
-
-
-# def check_and_difference(data, column_names, plot=False):
-#     """
-#     Check if the data in the specified columns are stationary.
-#     If not, difference the data to make it stationary.
-#     Optionally plot the original and differenced data.
-
-#     Parameters:
-#     - data: pandas DataFrame containing the time series data.
-#     - column_names: list of strings, the names of the columns to check and difference.
-#     - plot: bool, whether to plot the original and differenced series for each column.
-
-#     Returns:
-#     - modified_data: pandas DataFrame with the differenced series where necessary.
-#     """
-#     # Copy the input DataFrame to avoid modifying the original data
-#     modified_data = data.copy()
-
-#     for column_name in column_names:
-#         # Perform Augmented Dickey-Fuller test
-#         result = adfuller(modified_data[column_name])
-#         print(f'ADF Statistic for {column_name}: {result[0]}')
-#         print(f'p-value for {column_name}: {result[1]}')
-#         print('Critical Values:')
-#         for key, value in result[4].items():
-#             print(f'\t{key}: {value}')
-
-#         # Check if stationary
-#         if result[1] > 0.05:
-#             print(f"Data in {column_name} is not stationary. Differencing the data...")
-#             modified_data[column_name] = modified_data[column_name].diff().dropna()
-#         else:
-#             print(f"Data in {column_name} is stationary.")
-
-#         # Plot if required
-#         if plot:
-#             plt.figure(figsize=(10, 6))
-#             plt.plot(data[column_name], label='Original')
-#             plt.plot(modified_data[column_name], label='Differenced', linestyle='--')
-#             plt.legend()
-#             plt.title(f"Original vs Differenced Data for {column_name}")
-#             plt.show()
-
-#     return modified_data.dropna()
 
 
 
@@ -218,6 +228,135 @@ def gc4vars(df, max_lags=10, print_results=True):
             })
     
     return gc_results
+
+
+# import numpy as np
+# from statsmodels.tsa.stattools import grangercausalitytests
+# from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# def gc_test_single_pair(data_x_col, data_y, max_lags=4):
+#     combined_data = np.column_stack((data_x_col, data_y))
+#     result_xy = grangercausalitytests(combined_data, max_lags, verbose=False)
+#     test_result_xy = any(result_xy[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+#     return test_result_xy
+
+# def gc_test_parallel(data_x, data_y, max_lags=4):
+#     n_series = data_x.shape[1]
+#     results_xy = np.zeros(n_series, dtype=bool)
+    
+#     with ThreadPoolExecutor() as executor:
+#         future_to_series = {executor.submit(gc_test_single_pair, data_x[:, i], data_y, max_lags): i for i in range(n_series)}
+#         for future in as_completed(future_to_series):
+#             series_index = future_to_series[future]
+#             results_xy[series_index] = future.result()
+    
+#     return results_xy
+
+
+# import numpy as np
+# from statsmodels.tsa.stattools import adfuller, kpss, grangercausalitytests
+
+# def is_stationary_fast(ndarray, test_method='ADF'):
+#     """
+#     Test if a time series is stationary, optimized for speed.
+    
+#     Parameters:
+#     - ndarray: NumPy ndarray, the time series data.
+#     - test_method: string, the method used to test for stationarity ('ADF' or 'KPSS').
+    
+#     Returns:
+#     - bool: True if the series is stationary, False otherwise.
+#     """
+#     if test_method == 'ADF':
+#         test_result = adfuller(ndarray, autolag='AIC')
+#         return test_result[1] <= 0.05  # p-value
+#     elif test_method == 'KPSS':
+#         test_result = kpss(ndarray, regression='c', nlags="auto")
+#         return test_result[1] > 0.05  # p-value
+#     else:
+#         raise ValueError("Unsupported test method. Use 'ADF' or 'KPSS'.")
+
+# # def make_stationary_fast(ndarray, test_method='ADF'):
+# #     """
+# #     Makes a time series stationary if it's not already, optimized for speed.
+    
+# #     Parameters:
+# #     - ndarray: NumPy ndarray, the time series data.
+# #     - test_method: string, the method used to test for stationarity.
+    
+# #     Returns:
+# #     - ndarray: The (possibly differenced) stationary time series.
+# #     """
+# #     for _ in range(5):  # Attempt up to 5 differencing operations
+# #         if is_stationary_fast(ndarray, test_method):
+# #             break
+# #         ndarray = np.diff(ndarray, n=1)  # Difference the series
+# #     return ndarray
+    
+
+# def make_stationary_fast(series_a, series_b, test_method='ADF'):
+#     """
+#     Makes two time series stationary, ensuring they are differenced the same number of times.
+
+#     Parameters:
+#     - series_a, series_b: NumPy ndarrays, the time series data.
+#     - test_method: string, the method used to test for stationarity.
+
+#     Returns:
+#     - Tuple of NumPy ndarrays: The (possibly differenced) stationary time series.
+#     """
+#     max_diffs = 0
+#     for series in [series_a, series_b]:
+#         for diffs in range(1, 6):  # Attempt up to 5 differencing operations
+#             if is_stationary_fast(series, test_method):
+#                 max_diffs = max(max_diffs, diffs-1)
+#                 break
+#             series = np.diff(series, n=1)  # Difference the series
+
+#     # Apply the maximum number of differences needed to both series
+#     if max_diffs > 0:
+#         series_a = np.diff(series_a, n=max_diffs)
+#         series_b = np.diff(series_b, n=max_diffs)
+
+#     return series_a, series_b
+
+# def gc_test_refactored(data_x, data_y, max_lags=4):
+#     """
+#     Perform Granger Causality test and return boolean results.
+    
+#     Parameters:
+#     - data_x, data_y: NumPy ndarrays containing the time series data for X and Y.
+#     - max_lags: int, maximum number of lags to test for.
+    
+#     Returns:
+#     - Tuple of two booleans: (result_xy, result_yx) indicating the direction of Granger causality.
+#     """
+#     # Make data stationary
+#     # data_x, data_y = make_stationary_fast(data_x,data_y,'ADF')
+
+    
+#     # Combine into a 2D array as required by grangercausalitytests
+#     combined_data = np.column_stack((data_x, data_y))
+    
+#     # Granger Causality test
+#     result_xy = grangercausalitytests(combined_data, max_lags, verbose=False)
+#     result_yx = grangercausalitytests(combined_data[:, [1, 0]], max_lags, verbose=False)
+    
+#     # Simplify result interpretation
+#     test_result_xy = any(result_xy[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+#     test_result_yx = any(result_yx[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+    
+#     return test_result_xy, test_result_yx
+
+
+
+
+
+
+
+
+
+
 
 
 from statsmodels.tsa.arima.model import ARIMA
