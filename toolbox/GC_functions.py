@@ -470,3 +470,29 @@ def plot_causal_graph(gc_results, variables=None,dpi=600):
     plt.axis('off')  # Turn off the axis
     plt.show()  # Display the graph
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+
+def causal_matshow(causal_results):
+    fig, ax = plt.subplots(figsize=(7, 6), dpi=600)
+    cmap = colors.ListedColormap(['wheat', 'mediumseagreen'])
+    bounds = [-0.5, 0.5, 1.5]
+    norm = colors.BoundaryNorm(bounds, cmap.N)
+
+    cax = ax.matshow(causal_results, interpolation='nearest', cmap=cmap, norm=norm)
+    cbar = fig.colorbar(cax, ticks=[0, 1], shrink=0.8)
+
+    lags = np.arange(causal_results.shape[1]) * 10  # Multiply by 10 for lags
+    causal_strengths = np.linspace(0, 1, causal_results.shape[0])  # Linear space for causal strengths
+
+    ax.set_xticks(np.arange(len(lags)))
+    ax.set_xticklabels(lags)
+    ax.set_yticks(np.arange(len(causal_strengths)))
+    ax.set_yticklabels(np.round(causal_strengths, 1))
+    ax.set_xlabel('Lags (Years)')
+    ax.set_ylabel('Causal Strength')
+    ax.xaxis.set_ticks_position('bottom')
+
+    plt.show()
