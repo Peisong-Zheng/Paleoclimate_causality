@@ -95,61 +95,61 @@ def make_stationary(df, column_names, test_method='ADF',plot=False, print_result
 
 
 
-from statsmodels.tsa.stattools import grangercausalitytests
-import numpy as np
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# from statsmodels.tsa.stattools import grangercausalitytests
+# import numpy as np
+# from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def gc_test_single_pair(args):
-    """
-    Perform Granger Causality test for a single pair of time series.
+# def gc_test_single_pair(args):
+#     """
+#     Perform Granger Causality test for a single pair of time series.
     
-    Parameters:
-    - args: tuple containing data_x_col, data_y_col, and max_lags
+#     Parameters:
+#     - args: tuple containing data_x_col, data_y_col, and max_lags
     
-    Returns:
-    - Tuple of two booleans: (result_xy, result_yx) indicating the direction of Granger causality for the pair.
-    """
-    data_x_col, data_y_col, max_lags = args
+#     Returns:
+#     - Tuple of two booleans: (result_xy, result_yx) indicating the direction of Granger causality for the pair.
+#     """
+#     data_x_col, data_y_col, max_lags = args
     
-    # Drop NaN values from both time series
-    valid_idx = ~np.isnan(data_x_col) & ~np.isnan(data_y_col)
-    data_x_col_clean = data_x_col[valid_idx]
-    data_y_col_clean = data_y_col[valid_idx]
+#     # Drop NaN values from both time series
+#     valid_idx = ~np.isnan(data_x_col) & ~np.isnan(data_y_col)
+#     data_x_col_clean = data_x_col[valid_idx]
+#     data_y_col_clean = data_y_col[valid_idx]
 
-    # Combine the cleaned and cropped data for Granger Causality test
-    combined_data = np.column_stack((data_x_col_clean, data_y_col_clean))
+#     # Combine the cleaned and cropped data for Granger Causality test
+#     combined_data = np.column_stack((data_x_col_clean, data_y_col_clean))
     
-    # Granger Causality test
-    result_xy = grangercausalitytests(combined_data, max_lags, verbose=False)
-    result_yx = grangercausalitytests(combined_data[:, [1, 0]], max_lags, verbose=False)
+#     # Granger Causality test
+#     result_xy = grangercausalitytests(combined_data, max_lags, verbose=False)
+#     result_yx = grangercausalitytests(combined_data[:, [1, 0]], max_lags, verbose=False)
     
-    # Simplify result interpretation
-    test_result_xy = any(result_xy[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
-    test_result_yx = any(result_yx[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+#     # Simplify result interpretation
+#     test_result_xy = any(result_xy[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
+#     test_result_yx = any(result_yx[lag][0]['ssr_ftest'][1] < 0.05 for lag in range(1, max_lags + 1))
     
-    return test_result_xy, test_result_yx
+#     return test_result_xy, test_result_yx
 
-def gc_test_parallel(data_x, data_y, max_lags=4, num_workers=None):
-    """
-    Perform Granger Causality tests in parallel for each pair of columns in data_x and data_y.
+# def gc_test_parallel(data_x, data_y, max_lags=4, num_workers=None):
+#     """
+#     Perform Granger Causality tests in parallel for each pair of columns in data_x and data_y.
     
-    Parameters:
-    - data_x, data_y: 2D NumPy ndarrays containing the time series data.
-    - max_lags: int, maximum number of lags to test for.
-    - num_workers: int or None, number of worker threads to use. If None, it will use the default.
+#     Parameters:
+#     - data_x, data_y: 2D NumPy ndarrays containing the time series data.
+#     - max_lags: int, maximum number of lags to test for.
+#     - num_workers: int or None, number of worker threads to use. If None, it will use the default.
     
-    Returns:
-    - List of tuples with the Granger Causality test results for each pair.
-    """
-    num_series = data_x.shape[1]
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = [executor.submit(gc_test_single_pair, (data_x[:, i], data_y[:, i], max_lags)) for i in range(num_series)]
+#     Returns:
+#     - List of tuples with the Granger Causality test results for each pair.
+#     """
+#     num_series = data_x.shape[1]
+#     with ThreadPoolExecutor(max_workers=num_workers) as executor:
+#         futures = [executor.submit(gc_test_single_pair, (data_x[:, i], data_y[:, i], max_lags)) for i in range(num_series)]
         
-        results = []
-        for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
-    return results
+#         results = []
+#         for future in as_completed(futures):
+#             result = future.result()
+#             results.append(result)
+#     return results
 
 
 
@@ -168,8 +168,8 @@ def gc_test(data, column_x, column_y, max_lags=4, print_results=True):
     Returns:
     - Formatted result as a string.
     """
-    result_xy = grangercausalitytests(data[[column_x, column_y]], max_lags, verbose=False)
-    result_yx = grangercausalitytests(data[[column_y, column_x]], max_lags, verbose=False)
+    result_yx = grangercausalitytests(data[[column_x, column_y]], max_lags, verbose=False)
+    result_xy = grangercausalitytests(data[[column_y, column_x]], max_lags, verbose=False)
     
     # Initialize variables to store the best p-value and corresponding F statistic and lag
     best_p_xy, best_f_xy, best_lag_xy = 1, None, None
@@ -217,8 +217,8 @@ def gc4vars(df, max_lags=10, print_results=True):
             
             # Parse the result_str to extract causality results
             lines = result_str.split('\n')
-            cause_xy = lines[-3].split()[-1]  # Extracts the "True" or "False" for X => Y
-            cause_yx = lines[-2].split()[-1]  # Extracts the "True" or "False" for Y => X
+            cause_yx = lines[-3].split()[-1]  # Extracts the "True" or "False" for X => Y
+            cause_xy = lines[-2].split()[-1]  # Extracts the "True" or "False" for Y => X
             
             # Store the results
             gc_results.append({
