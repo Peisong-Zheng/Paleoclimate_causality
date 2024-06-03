@@ -1,7 +1,0 @@
-digraph {
-	A [label=Root]
-	B [label="Child 1"]
-	C [label="Child 2"]
-	A -> B
-	A -> C
-}
