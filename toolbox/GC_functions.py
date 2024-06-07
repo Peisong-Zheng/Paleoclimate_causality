@@ -455,14 +455,15 @@ def plot_causal_graph(gc_results, variables=None,dpi=600):
 
     plt.figure(figsize=(7, 7), dpi=dpi)  # Set the size of the figure
 
+    connectionstyle = 'arc3,rad=0.1' 
     # Draw the nodes
-    nx.draw_networkx_nodes(G, pos, node_size=3000, edgecolors='black', node_color='lightskyblue', linewidths=1, alpha=1)
+    nx.draw_networkx_nodes(G, pos, node_size=4200, edgecolors='black', node_color='grey', linewidths=2, alpha=1)
 
     # Draw the edges
     nx.draw_networkx_edges(G, pos, edgelist=edges_uni, edge_color='black', arrows=True, width=3, arrowsize=30,
-                           min_source_margin=40, min_target_margin=40)
-    nx.draw_networkx_edges(G, pos, edgelist=edges_bi, edge_color='red', arrows=True, width=3, arrowsize=30,
-                           min_source_margin=40, min_target_margin=40)
+                           min_source_margin=40, min_target_margin=40, connectionstyle=connectionstyle)
+    nx.draw_networkx_edges(G, pos, edgelist=edges_bi, edge_color='violet', arrows=True, width=3, arrowsize=30,
+                           min_source_margin=40, min_target_margin=40, connectionstyle=connectionstyle)
 
     # Labels for the nodes
     nx.draw_networkx_labels(G, pos, font_size=10)

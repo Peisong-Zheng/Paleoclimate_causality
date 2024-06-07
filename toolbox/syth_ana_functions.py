@@ -37,7 +37,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import matplotlib.colors as colors
 
 # Testing the updated function with the grid lines aligned to the cell boundaries
-def causal_matshow_ax(causal_results, counts, ax, X, Y, title='Causal Results', ylabel='Causal Strength', show_counts=False):
+def causal_matshow_ax(causal_results, counts=[], ax=[], X=[], Y=[], title='Causal Results', ylabel='Causal Strength', show_counts=False):
     cmap = ListedColormap(['white', 'green'])  # white for low confidence, green for high confidence
     bounds = [-0.5, 0.5, 1.5]
     norm = colors.BoundaryNorm(bounds, cmap.N)
@@ -77,6 +77,54 @@ def causal_matshow_ax(causal_results, counts, ax, X, Y, title='Causal Results', 
                     ax.text(j, i, str(int(counts[i, j])), fontsize=8, va='center', ha='center', color='black')
 
 
+
+##########################################################################################################
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.patches import Rectangle
+
+def causal_colormap_ax(causal_results, counts, ax, X, Y, title='Causal Results', ylabel='Causal Strength', show_counts=False, cmap='viridis', vmin=0, vmax=100):
+    # Use a continuous colormap for the counts
+    cmap = plt.get_cmap(cmap)
+    norm = colors.Normalize(vmin=vmin, vmax=vmax)  # Set vmin and vmax directly in the Normalize instance
+
+    # Create a color mesh for counts using only norm for vmin and vmax handling
+    cax = ax.matshow(counts, cmap=cmap, norm=norm)
+    
+    # Setup the colorbar using the predefined vmin and vmax
+    plt.colorbar(cax, ax=ax, ticks=np.linspace(vmin, vmax, num=5), shrink=0.6)  # Use linspace to generate ticks from vmin to vmax
+
+    # Set ticks to be at the boundaries of the cells
+    ax.set_xticks(np.arange(-0.5, len(X), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(Y), 1), minor=True)
+    
+    # Major ticks should be at the center of each cell for the labels
+    ax.set_xticks(np.arange(len(X)))
+    ax.set_yticks(np.arange(len(Y)))
+    ax.set_yticklabels([f'{y:.0e}' for y in Y])  # Format labels in scientific notation
+    
+    ax.set_xlabel('Lags (yr)')
+    ax.set_ylabel(ylabel)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_title(title)
+    ax.set_xticklabels([str(int(i*10)) for i in ax.get_xticks()])
+
+    # Highlight cells where causal_results is 1 by adding black borders
+    for i in range(causal_results.shape[0]):
+        for j in range(causal_results.shape[1]):
+            if causal_results[i, j] == 1:
+                # Add a black rectangle
+                ax.add_patch(Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, edgecolor='black', lw=1.5))
+            
+            if show_counts and not np.isnan(counts[i, j]):
+                # Show counts as text
+                ax.text(j, i, str(int(counts[i, j])), fontsize=8, va='center', ha='center', color='white' if counts[i,j] > vmax/2 else 'black')
+
+    for axis in ['top','bottom','left','right']:
+        ax.spines[axis].set_linewidth(1.5)
 
 
 
