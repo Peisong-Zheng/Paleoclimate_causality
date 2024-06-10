@@ -129,6 +129,110 @@ def causal_colormap_ax(causal_results, counts, ax, X, Y, title='Causal Results',
 
 
 
+# import numpy as np
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# import matplotlib.colors as colors
+# from matplotlib.patches import Rectangle
+
+# def causal_colormap_ax_1d(causal_results, counts, ax, X, Y, title='Causal Results', ylabel='Causal Strength', show_counts=False, cmap='viridis', vmin=0, vmax=100):
+#     # Use a continuous colormap for the counts
+#     cmap = plt.get_cmap(cmap)
+#     norm = colors.Normalize(vmin=vmin, vmax=vmax)
+
+#     # Since the data is now 1D, we need to expand it artificially to 2D for plotting
+#     # Here, we take a slice at the first x-value (assuming the input is now 1D).
+#     counts_2d = np.expand_dims(counts, axis=1)  # Make it 2D by adding a new dimension
+#     causal_results_2d = np.expand_dims(causal_results, axis=1)
+
+#     print(counts_2d.shape)
+#     print(causal_results_2d.shape)
+
+#     # Create a color mesh for counts using only norm for vmin and vmax handling
+#     cax = ax.matshow(counts_2d, cmap=cmap, norm=norm)
+    
+#     # Setup the colorbar using the predefined vmin and vmax
+#     plt.colorbar(cax, ax=ax, ticks=np.linspace(vmin, vmax, num=5), shrink=0.6)
+
+#     # Setup the axes labels and titles
+#     ax.set_xlabel('Lags (yr)')
+#     ax.set_ylabel(ylabel)
+#     ax.xaxis.set_ticks_position('bottom')
+#     ax.set_title(title)
+
+#     # Set ticks and labels
+#     ax.set_yticks(np.arange(len(Y)))
+#     ax.set_xticks([])  # No y-ticks as we have only one y-value
+#     ax.set_yticklabels([f'{y:.5f}' for y in Y])  # Assuming X is a list of years or similar
+
+#     # Highlight cells where causal_results is 1 by adding black borders
+#     for i in range(len(causal_results_2d[0])):
+#         if causal_results_2d[i, 0] == 1:
+#             # Add a black rectangle
+#             ax.add_patch(Rectangle((0 - 0.5, i - 0.5), 1, 1, fill=False, edgecolor='black', lw=1.5))
+        
+#         if show_counts and not np.isnan(counts_2d[i, 0]):
+#             # Show counts as text
+#             ax.text(0, i, str(int(counts_2d[i, 0])), fontsize=8, va='center', ha='center', color='white' if counts_2d[i, 0] > vmax/2 else 'black')
+
+#     for axis in ['top','bottom','left','right']:
+#         ax.spines[axis].set_linewidth(1.5)
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.patches import Rectangle
+
+def causal_colormap_ax_1d(causal_results, counts, ax, X, Y, title='Causal Results', ylabel='Causal Strength', show_counts=False, cmap='viridis', vmin=0, vmax=100, box_linewidth=1.5):
+    # Use a continuous colormap for the counts
+    cmap = plt.get_cmap(cmap)
+    norm = colors.Normalize(vmin=vmin, vmax=vmax)
+
+    # Convert the 1D arrays to 2D for visualization by adding a new dimension
+    counts_2d = np.expand_dims(counts, axis=1)
+    causal_results_2d = np.expand_dims(causal_results, axis=1)
+
+    # reverse the color map
+    # cmap = cmap.reversed()
+    # Create a color mesh for counts using the colormap and normalization
+    cax = ax.matshow(counts_2d, cmap=cmap, norm=norm)
+
+    # Setup the colorbar using the predefined vmin and vmax
+    plt.colorbar(cax, ax=ax, ticks=np.linspace(vmin, vmax, num=5), shrink=0.6)
+
+    # Setting the axes labels and titles
+    ax.set_xlabel('Lags (yr)')
+    ax.set_ylabel(ylabel)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_title(title)
+
+    # Configure the ticks
+    ax.set_yticks(np.arange(len(Y)))
+    ax.set_yticklabels([f'{y:.3f}' for y in Y])  # Format Y labels with more precision
+    ax.set_xticks([0])
+    # ax.set_xticklabels(['Fixed X'])
+
+    # Highlight cells where causal_results is 1 by adding black borders
+    for i in range(len(causal_results)):
+        if causal_results[i] == 0:
+            # Add a black rectangle around the cell
+            ax.add_patch(Rectangle((0 - 0.5, i - 0.5), 1, 1, fill=False, edgecolor='k', lw=1.5))
+        
+        if show_counts and not np.isnan(counts[i]):
+            # Show counts as text
+            text_color = 'white' if counts[i] > vmax/2 else 'black'
+            ax.text(0, i, f'{counts[i]:.0f}', fontsize=8, va='center', ha='center', color=text_color)
+
+    # Styling the plot frame
+    for axis in ['top','bottom','left','right']:
+        ax.spines[axis].set_linewidth(box_linewidth)
+
+
+    
+
+
+
 
 
 # functions from John Slattery's work
@@ -236,6 +340,71 @@ def gen_bi_directional_data(length, delta=10.0, lag=-3, t0=800.0, dt=50.0, dy=1.
 
     A=trans_A+A
     B=trans_B+B
+    
+    df = pd.DataFrame({
+        'time': time,
+        'A': A,
+        'B': B
+    })
+    
+    # drop nan values
+    df = df.dropna()
+
+    return df
+
+
+
+import numpy as np
+import pandas as pd
+
+def gen_independent_data(length, delta=10.0, lag=-3, t0=800.0, dt=50.0, dy=1.0, GS_slope=5e-4, GIS_slope=-1e-3, tau=1.0, phi=1e-2, sigma=0.05):
+    """
+    Generate time series data demonstrating bi-directional causality.
+    
+    Args:
+    length (int): Length of the time series data.
+    delta (float): Time step.
+    sigma (float): Standard deviation of the noise.
+    alpha, beta, gamma, (float): Coefficients describing the interaction between the series.
+
+    Returns:
+    pandas.DataFrame: DataFrame containing bi-directionally linked synthetic data.
+
+    """
+    # # let lag must be nagative integer
+    # if lag > 0:
+    #     raise ValueError('Lag must be a negative integer.')
+
+    # # let beta to smaller than 1e-4
+    # if phi > 1e-1:
+    #     raise ValueError('Beta must be smaller than 1e-1.')
+
+
+    time = np.arange(length, step=delta, dtype='float')
+    A = np.zeros(len(time))
+    B = np.zeros(len(time))
+
+    A[0] = np.random.normal(0, sigma)
+    B[0] = np.random.normal(0, sigma)
+
+    alpha = np.exp(-delta / tau)
+    
+    for t in range(1, len(time)):
+        A[t] = alpha * A[t-1]  + np.random.normal(0, sigma)+np.random.normal(0, phi)
+        B[t] = alpha * B[t-1] + np.random.normal(0, sigma)+np.random.normal(0, phi)
+        # A[t] = np.random.normal(0, sigma)+np.random.normal(0, phi)
+        # B[t] = np.random.normal(0, sigma)+np.random.normal(0, phi)
+
+
+    
+    # trans_A = linear_ramp(time, t0=t0, dt=dt, y0=0.0, dy=dy, GS_slope=GS_slope, GIS_slope=GIS_slope)
+
+    # # trans_B = linear_ramp(time, t0=t0-lag*10, dt=dt, y0=0.0, dy=dy, GS_slope=GS_slope, GIS_slope=GIS_slope)
+    # trans_B = trans_A
+
+
+    # A=trans_A+A
+    # B=trans_B+B
     
     df = pd.DataFrame({
         'time': time,
