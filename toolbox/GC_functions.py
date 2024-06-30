@@ -52,7 +52,7 @@ def is_stationary(series, test_method='ADF', print_results=True):
 
 
 
-def make_stationary(df, column_names, test_method='ADF',plot=False, print_results=False):
+def make_stationary(df, column_names, test_method='ADF',plot=True, print_results=False):
     """
     Process the specified columns of a DataFrame to ensure stationarity.
     If a series is not stationary, it is differenced up to a maximum of 5 times.
